@@ -34,7 +34,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.UserHo
     private final int DEFAULT_ROW = 0;
     private final int CURRENT_USER_ROW = 1;
     public RecyclerAdapter(List<User> users, Context context, User currentUser) {
-        mUsers = new ArrayList<User>(users);
+        mUsers = users != null ? new ArrayList<>(users) : new ArrayList<User>();
         if( currentUser != null){
             mUsers.add(0, currentUser);
             currentUserFirst = true;
