@@ -1,5 +1,7 @@
 package com.bypassmobile.octo;
 
+import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -13,6 +15,8 @@ import com.bypassmobile.octo.model.User;
 import com.google.gson.Gson;
 
 import java.util.List;
+import java.util.Observable;
+
 import butterknife.Bind;
 import butterknife.ButterKnife;
 import rx.android.schedulers.AndroidSchedulers;
@@ -29,6 +33,17 @@ public class MainActivity extends BaseActivity {
     @Bind(R.id.github_contact_recycler)
     RecyclerView mRecycler;
 
+    User currentUser;
+
+    private static final String USER_EXTRA_LABEL = "user_extra_label";
+
+    public static Intent getUserIntent(User u, Context context){
+        Intent i = new Intent(context, MainActivity.class);
+        Gson g = new Gson();
+        i.putExtra(USER_EXTRA_LABEL, g.toJson(u));
+        return i;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -36,41 +51,42 @@ public class MainActivity extends BaseActivity {
         ButterKnife.bind(this);
         setSupportActionBar(mToolbar);
         mRecycler.setLayoutManager(new LinearLayoutManager(this));
-        getEndpoint().getOrganizationMember("bypasslane")
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                /*.flatMap(new Func1<List<User>, rx.Observable<User>>() {
-                    @Override
-                    public rx.Observable<User> call(List<User> users) {
-                        return rx.Observable.from(users);
-                    }
-                })*/
-                .subscribe(new Action1<List<User>>() {
-                    @Override
-                    public void call(List<User> users) {
-                        updateRecycler(users);
-                    }
-                });
+
+        rx.Observable<List<User>> userObservable;
+        currentUser = null;
+        if(getIntent().getStringExtra(MainActivity.USER_EXTRA_LABEL) != null){
+            Gson g = new Gson();
+            currentUser = g.fromJson(getIntent().getStringExtra(USER_EXTRA_LABEL), User.class);
+            userObservable = getEndpoint().getFollowingUser(currentUser.getName());
+
+        }else{
+            userObservable = getEndpoint().getOrganizationMember("bypasslane");
+        }
+
+        userObservable
+        .subscribeOn(Schedulers.io())
+        .observeOn(AndroidSchedulers.mainThread())
+        .subscribe(new Action1<List<User>>() {
+            @Override
+            public void call(List<User> users) {
+                updateRecycler(users);
+            }
+        });
 
     }
 
     private void updateRecycler(List<User> users){
-        mRecycler.setAdapter(new RecyclerAdapter(users, this));
+        mRecycler.setAdapter(new RecyclerAdapter(users, this, currentUser));
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        
-        // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
         if (id == R.id.action_settings) {
             return true;

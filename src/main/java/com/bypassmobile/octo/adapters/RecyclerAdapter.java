@@ -1,14 +1,17 @@
 package com.bypassmobile.octo.adapters;
 
 import android.content.Context;
+import android.content.Intent;
 import android.media.Image;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.bypassmobile.octo.MainActivity;
 import com.bypassmobile.octo.R;
 import com.bypassmobile.octo.image.ImageLoader;
 import com.bypassmobile.octo.model.User;
@@ -27,48 +30,89 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.UserHo
     private List<User> mUsers;
     private Context mContext;
     private Picasso mImageLoader;
+    private boolean currentUserFirst;
 
-    public RecyclerAdapter(List<User> users, Context context) {
+    private final int DEFAULT_ROW = 0;
+    private final int CURRENT_USER_ROW = 1;
+    public RecyclerAdapter(List<User> users, Context context, User currentUser) {
         mUsers = users;
+        if( currentUser != null){
+            mUsers.add(0, currentUser);
+            currentUserFirst = true;
+        }
         mContext = context;
         mImageLoader = ImageLoader.createImageLoader(mContext);
     }
 
     @Override
     public UserHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        View inflatedView = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.adapter_row, parent, false);
-        return new UserHolder(inflatedView);
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.adapter_row, parent, false);
+
+        return new UserHolder(view, viewType);
     }
 
     @Override
     public void onBindViewHolder(UserHolder holder, int position) {
-        holder.bindUser(mUsers.get(position%(mUsers.size())));
+        UserHolder userHolder = (UserHolder) holder;
+        userHolder.bindUser(mUsers.get(position));
+
     }
 
     @Override
     public int getItemCount() {
-        return mUsers.size()*8;
+        return  mUsers.size();
     }
 
-    public class UserHolder extends RecyclerView.ViewHolder {
+    @Override
+    public int getItemViewType(int position) {
+        return (position == 0 ) && currentUserFirst ? CURRENT_USER_ROW : DEFAULT_ROW;
+    }
+
+
+
+
+    public class UserHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
         @Bind(R.id.avatar_imageview)
         ImageView mAvatarImageView;
 
         @Bind(R.id.username_textview)
         TextView mUsernameTextView;
 
-        public UserHolder(View itemView) {
+        int mType;
+
+        public UserHolder(View itemView, int type) {
             super(itemView);
             ButterKnife.bind(this, itemView);
+            mType = type;
+            if(type == DEFAULT_ROW){
+                itemView.setOnClickListener(this);
+            }else{
+                ViewGroup.LayoutParams params = itemView.getLayoutParams();
+                params.height = 48;
+                mAvatarImageView.setVisibility(View.INVISIBLE);
+
+            }
+
+
 
         }
 
         public void bindUser(User user) {
-            mImageLoader.load(user.getProfileURL())
-                    .transform(new CircleTransform())
-                    .into(mAvatarImageView);
-            mUsernameTextView.setText(user.getName());
+            if(mType == DEFAULT_ROW){
+                mImageLoader.load(user.getProfileURL())
+                        .transform(new CircleTransform())
+                        .into(mAvatarImageView);
+                mUsernameTextView.setText(user.getName());
+            } else if(mType == CURRENT_USER_ROW){
+                mUsernameTextView.setText(user.getName()+" follows");
+            }
+
+        }
+
+        @Override
+        public void onClick(View v) {
+            User u = mUsers.get(getAdapterPosition());
+            mContext.startActivity(MainActivity.getUserIntent(u, mContext));
         }
     }
 }
