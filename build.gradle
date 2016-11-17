@@ -25,6 +25,7 @@ dependencies {
     compile 'com.android.support:appcompat-v7:+'
     compile 'com.android.support:design:23.1.1'
     compile 'com.jakewharton:butterknife:7.0.1'
+    compile 'com.jakewharton.rxbinding:rxbinding-appcompat-v7:0.4.0'
 
 }
 

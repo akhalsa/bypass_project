@@ -14,20 +14,26 @@ import android.view.Menu;
 import android.view.MenuItem;
 
 import com.bypassmobile.octo.adapters.RecyclerAdapter;
+import com.bypassmobile.octo.model.SearchResponse;
 import com.bypassmobile.octo.model.User;
 import com.google.gson.Gson;
+import com.jakewharton.rxbinding.support.v7.widget.RxSearchView;
+import com.jakewharton.rxbinding.support.v7.widget.SearchViewQueryTextEvent;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Observable;
+import java.util.concurrent.TimeUnit;
 
 import butterknife.Bind;
 import butterknife.ButterKnife;
+import rx.Subscriber;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
-public class MainActivity extends BaseActivity implements android.support.v7.widget.SearchView.OnQueryTextListener {
+public class MainActivity extends BaseActivity /*implements android.support.v7.widget.SearchView.OnQueryTextListener */{
 
 
     @Bind(R.id.my_toolbar)
@@ -57,18 +63,19 @@ public class MainActivity extends BaseActivity implements android.support.v7.wid
 
         rx.Observable<List<User>> userObservable;
         currentUser = null;
+        if(currentUser != null){
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+
         if(getIntent().getStringExtra(MainActivity.USER_EXTRA_LABEL) != null){
             Gson g = new Gson();
             currentUser = g.fromJson(getIntent().getStringExtra(USER_EXTRA_LABEL), User.class);
             userObservable = getEndpoint().getFollowingUser(currentUser.getName());
 
-        }else{
+        } else{
             userObservable = getEndpoint().getOrganizationMember("bypasslane");
         }
-        if(currentUser != null){
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        }
-
+        
         userObservable
         .subscribeOn(Schedulers.io())
         .observeOn(AndroidSchedulers.mainThread())
@@ -78,9 +85,45 @@ public class MainActivity extends BaseActivity implements android.support.v7.wid
                 updateRecycler(users);
             }
         });
-
     }
 
+    private void monitorSearchView(SearchView searchView){
+        RxSearchView.queryTextChangeEvents(searchView)
+                .debounce(750, TimeUnit.MILLISECONDS)
+                .filter(new Func1<SearchViewQueryTextEvent, Boolean>() {
+                    @Override
+                    public Boolean call(SearchViewQueryTextEvent searchViewQueryTextEvent) {
+                        return searchViewQueryTextEvent.queryText().length() > 0;
+                    }
+                })
+                .observeOn(Schedulers.io())
+                .flatMap(new Func1<SearchViewQueryTextEvent, rx.Observable<SearchResponse>>() {
+                    @Override
+                    public rx.Observable<SearchResponse> call(SearchViewQueryTextEvent searchViewQueryTextEvent) {
+                        return getEndpoint().searchUsers(searchViewQueryTextEvent.queryText().toString())
+                                .onErrorReturn(new Func1<Throwable, SearchResponse>() {
+                                    @Override
+                                    public SearchResponse call(Throwable throwable) {
+                                        return new SearchResponse();
+                                    }
+                                });
+                    }
+                })
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(new Func1<SearchResponse, List<User>>() {
+
+                    @Override
+                    public List<User> call(SearchResponse searchResponse) {
+                        return searchResponse.getItems();
+                    }
+                })
+                .subscribe(new Action1<List<User>>() {
+                    @Override
+                    public void call(List<User> users) {
+                        updateRecycler(users);
+                    }
+                });
+    }
     private void updateRecycler(List<User> users){
         mRecycler.setAdapter(new RecyclerAdapter(users, this, currentUser));
     }
@@ -90,9 +133,7 @@ public class MainActivity extends BaseActivity implements android.support.v7.wid
         getMenuInflater().inflate(R.menu.main, menu);
         MenuItem searchItem =  menu.findItem(R.id.search);
         SearchView searchView = (SearchView) MenuItemCompat.getActionView(searchItem);
-        if (searchView != null) {
-            searchView.setOnQueryTextListener(this);
-        }
+        monitorSearchView(searchView);
         return true;
     }
 
@@ -106,14 +147,4 @@ public class MainActivity extends BaseActivity implements android.support.v7.wid
         return super.onOptionsItemSelected(item);
     }
 
-    @Override
-    public boolean onQueryTextSubmit(String query) {
-        return false;
-    }
-
-    @Override
-    public boolean onQueryTextChange(String newText) {
-        Log.v("avtar", "got new text: "+newText);
-        return false;
-    }
 }
