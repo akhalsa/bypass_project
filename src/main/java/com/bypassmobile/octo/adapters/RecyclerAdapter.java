@@ -1,14 +1,11 @@
 package com.bypassmobile.octo.adapters;
 
 import android.content.Context;
-import android.content.Intent;
-import android.media.Image;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.bypassmobile.octo.MainActivity;
@@ -17,6 +14,8 @@ import com.bypassmobile.octo.image.ImageLoader;
 import com.bypassmobile.octo.model.User;
 import com.bypassmobile.octo.thirdparty.CircleTransform;
 import com.squareup.picasso.Picasso;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import butterknife.Bind;
@@ -35,7 +34,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.UserHo
     private final int DEFAULT_ROW = 0;
     private final int CURRENT_USER_ROW = 1;
     public RecyclerAdapter(List<User> users, Context context, User currentUser) {
-        mUsers = users;
+        mUsers = new ArrayList<User>(users);
         if( currentUser != null){
             mUsers.add(0, currentUser);
             currentUserFirst = true;
@@ -58,16 +57,13 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.UserHo
 
     @Override
     public int getItemCount() {
-        return  mUsers.size();
+        return  mUsers!= null ? mUsers.size() : 0;
     }
 
     @Override
     public int getItemViewType(int position) {
         return (position == 0 ) && currentUserFirst ? CURRENT_USER_ROW : DEFAULT_ROW;
     }
-
-
-
 
     public class UserHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
         @Bind(R.id.avatar_imageview)
@@ -90,9 +86,6 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.UserHo
                 mAvatarImageView.setVisibility(View.INVISIBLE);
 
             }
-
-
-
         }
 
         public void bindUser(User user) {

@@ -33,9 +33,7 @@ import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
-public class MainActivity extends BaseActivity /*implements android.support.v7.widget.SearchView.OnQueryTextListener */{
-
-
+public class MainActivity extends BaseActivity{
     @Bind(R.id.my_toolbar)
     Toolbar mToolbar;
 
@@ -43,6 +41,8 @@ public class MainActivity extends BaseActivity /*implements android.support.v7.w
     RecyclerView mRecycler;
 
     User currentUser;
+    List<User> noSearchList;
+    Boolean isSearching = false;
 
     private static final String USER_EXTRA_LABEL = "user_extra_label";
 
@@ -63,10 +63,6 @@ public class MainActivity extends BaseActivity /*implements android.support.v7.w
 
         rx.Observable<List<User>> userObservable;
         currentUser = null;
-        if(currentUser != null){
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        }
-
         if(getIntent().getStringExtra(MainActivity.USER_EXTRA_LABEL) != null){
             Gson g = new Gson();
             currentUser = g.fromJson(getIntent().getStringExtra(USER_EXTRA_LABEL), User.class);
@@ -75,43 +71,54 @@ public class MainActivity extends BaseActivity /*implements android.support.v7.w
         } else{
             userObservable = getEndpoint().getOrganizationMember("bypasslane");
         }
-        
+        if(currentUser != null){
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
         userObservable
         .subscribeOn(Schedulers.io())
         .observeOn(AndroidSchedulers.mainThread())
         .subscribe(new Action1<List<User>>() {
             @Override
             public void call(List<User> users) {
+                //we need to store the noSearchList as a default
+                noSearchList = users;
                 updateRecycler(users);
             }
         });
     }
 
+
     private void monitorSearchView(SearchView searchView){
         RxSearchView.queryTextChangeEvents(searchView)
                 .debounce(750, TimeUnit.MILLISECONDS)
-                .filter(new Func1<SearchViewQueryTextEvent, Boolean>() {
-                    @Override
-                    public Boolean call(SearchViewQueryTextEvent searchViewQueryTextEvent) {
-                        return searchViewQueryTextEvent.queryText().length() > 0;
-                    }
-                })
                 .observeOn(Schedulers.io())
                 .flatMap(new Func1<SearchViewQueryTextEvent, rx.Observable<SearchResponse>>() {
                     @Override
                     public rx.Observable<SearchResponse> call(SearchViewQueryTextEvent searchViewQueryTextEvent) {
-                        return getEndpoint().searchUsers(searchViewQueryTextEvent.queryText().toString())
-                                .onErrorReturn(new Func1<Throwable, SearchResponse>() {
-                                    @Override
-                                    public SearchResponse call(Throwable throwable) {
-                                        return new SearchResponse();
-                                    }
-                                });
+                        if(searchViewQueryTextEvent.queryText().length() == 0){
+                            //if we have no query, we want to reset the value to the no search list we found initially
+                            //we will want isSearching to be false as well so that if we are several pages in
+                            //we will still see "$Username follows" in the first cell
+                            isSearching = false;
+                            SearchResponse searchResponse = new SearchResponse();
+                            searchResponse.setItems(noSearchList);
+                            return rx.Observable.just(searchResponse);
+                        }else{
+                            //ok we have a valid search, lets go ahead and get the possible matches out of the api
+                            isSearching = true;
+                            return getEndpoint().searchUsers(searchViewQueryTextEvent.queryText().toString())
+                                    .onErrorReturn(new Func1<Throwable, SearchResponse>() {
+                                        @Override
+                                        public SearchResponse call(Throwable throwable) {
+                                            return new SearchResponse();
+                                        }
+                                    });
+                        }
+
                     }
                 })
                 .observeOn(AndroidSchedulers.mainThread())
                 .map(new Func1<SearchResponse, List<User>>() {
-
                     @Override
                     public List<User> call(SearchResponse searchResponse) {
                         return searchResponse.getItems();
@@ -125,7 +132,9 @@ public class MainActivity extends BaseActivity /*implements android.support.v7.w
                 });
     }
     private void updateRecycler(List<User> users){
-        mRecycler.setAdapter(new RecyclerAdapter(users, this, currentUser));
+        //if were searching we always want to pass null as the current user
+        //this is because we wouldnt want the adapter to show the header cell
+        mRecycler.setAdapter(new RecyclerAdapter(users, this, isSearching ? null : currentUser));
     }
 
     @Override
