@@ -3,6 +3,7 @@ package com.bypassmobile.octo.model;
 
 import com.google.gson.annotations.SerializedName;
 
+
 public class User {
 
     @SerializedName("login")
@@ -11,9 +12,12 @@ public class User {
     @SerializedName("avatar_url")
     private final String profileURL;
 
-    public User(String name, String profileURL) {
+    private final String id;
+
+    public User(String name, String profileURL, String id) {
         this.name = name;
         this.profileURL = profileURL;
+        this.id = id;
     }
 
     public String getName() {
@@ -22,5 +26,9 @@ public class User {
 
     public String getProfileURL() {
         return profileURL;
+    }
+
+    public String getId(){
+        return id;
     }
 }
